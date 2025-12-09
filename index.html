@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MotoWeather Maps</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans h-screen flex flex-col overflow-hidden">
+
+    <header class="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center shadow-md z-10 shrink-0">
+        <div class="flex items-center gap-3">
+            <div class="bg-orange-600 p-2 rounded-lg">
+                <i data-lucide="bike" class="w-6 h-6 text-white"></i>
+            </div>
+            <h1 class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-orange-400 to-red-500">
+                MotoWeather Maps
+            </h1>
+        </div>
+        <button id="toggle-settings-btn" class="text-sm text-slate-400 hover:text-white underline flex items-center gap-2">
+            <i data-lucide="settings" class="w-4 h-4"></i> API Settings
+        </button>
+    </header>
+
+    <div class="flex flex-1 overflow-hidden relative">
+        <div class="w-full md:w-96 bg-slate-800 flex flex-col z-20 shadow-xl border-r border-slate-700 h-full">
+            <div class="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-6">
+                <div id="api-settings" class="hidden bg-slate-700/50 p-4 rounded-lg border border-slate-600 space-y-3">
+                    <h3 class="text-sm font-semibold text-orange-300 mb-2">API Configuration</h3>
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1">OpenRouteService Key</label>
+                        <input type="password" id="ors-key" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none text-white" placeholder="Paste ORS Key...">
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1">OpenWeatherMap Key</label>
+                        <input type="password" id="owm-key" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none text-white" placeholder="Paste OWM Key...">
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1">Gemini API Key</label>
+                        <input type="password" id="gemini-key" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none text-white" placeholder="Paste Gemini Key...">
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <div class="flex items-center gap-2 mb-2">
+                        <i data-lucide="navigation" class="w-5 h-5 text-orange-400"></i>
+                        <h2 class="text-lg font-semibold">Plan Your Ride</h2>
+                    </div>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="text-xs text-slate-400 uppercase font-bold tracking-wider">Start</label>
+                            <input type="text" id="start-city" value="Los Angeles" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 focus:ring-2 focus:ring-orange-500 outline-none transition-all text-white">
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-400 uppercase font-bold tracking-wider">Destination</label>
+                            <input type="text" id="end-city" value="San Diego" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 focus:ring-2 focus:ring-orange-500 outline-none transition-all text-white">
+                        </div>
+                    </div>
+                    <button id="plan-route-btn" class="w-full bg-orange-600 hover:bg-orange-500 text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-lg shadow-orange-900/20">
+                        <i data-lucide="search" class="w-5 h-5"></i> Find Route & Weather
+                    </button>
+                    <div id="error-msg" class="hidden p-3 bg-red-900/50 border border-red-800 text-red-200 text-sm rounded-lg"></div>
+                </div>
+
+                <div id="route-stats" class="hidden bg-slate-700/30 p-4 rounded-xl border border-slate-600 space-y-4 animate-in fade-in slide-in-from-top-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="p-3 bg-slate-800 rounded-lg text-center">
+                            <div class="text-xs text-slate-400">Distance</div>
+                            <div class="text-xl font-bold text-white" id="stat-dist">0 km</div>
+                        </div>
+                        <div class="p-3 bg-slate-800 rounded-lg text-center">
+                            <div class="text-xs text-slate-400">Est. Time</div>
+                            <div class="text-xl font-bold text-white" id="stat-time">0 hrs</div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-600/50">
+                        <button id="ai-insight-btn" class="bg-violet-700 hover:bg-violet-600 text-white py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-colors">
+                            <i data-lucide="sparkles" class="w-3 h-3"></i> Ride Insight
+                        </button>
+                        <button id="ai-packing-btn" class="bg-fuchsia-700 hover:bg-fuchsia-600 text-white py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-colors">
+                            <i data-lucide="backpack" class="w-3 h-3"></i> Gear Check
+                        </button>
+                    </div>
+                    <div id="ai-result-container" class="hidden mt-2 p-3 bg-slate-800 rounded-lg border border-slate-600/50 text-sm text-slate-200 prose-invert max-h-60 overflow-y-auto custom-scrollbar">
+                        <div id="ai-loading" class="flex items-center gap-2 text-slate-400">
+                            <i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Analyzing...
+                        </div>
+                        <div id="ai-content"></div>
+                    </div>
+                    <button id="save-route-btn" class="hidden w-full bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg flex items-center justify-center gap-2 text-sm transition-colors mt-2">
+                        <i data-lucide="save" class="w-4 h-4"></i> Save Route
+                    </button>
+                </div>
+
+                <div id="saved-routes-container" class="hidden flex-col">
+                    <h3 class="text-sm font-semibold text-slate-400 mb-3 flex items-center gap-2">
+                        <i data-lucide="bookmark" class="w-4 h-4"></i> Saved Routes
+                    </h3>
+                    <div id="saved-routes-list" class="space-y-2"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="map" class="flex-1 h-full z-10 bg-slate-900 relative">
+            <div id="loading-overlay" class="hidden absolute inset-0 bg-slate-900/80 z-[1000] flex flex-col items-center justify-center backdrop-blur-sm">
+                <i data-lucide="loader-2" class="w-10 h-10 text-orange-500 animate-spin mb-4"></i>
+                <div class="text-white font-semibold">Calculating Moto Route...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>
